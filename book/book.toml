@@ -2,3 +2,5 @@
 title = "Presolve Documentation"
 authors = ["Jimmy-Sim"]
 language = "en"
+[output.html]
+mathjax-support = true

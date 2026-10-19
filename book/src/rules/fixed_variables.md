@@ -12,6 +12,72 @@ Substituting `y = 4` changes the objective to `3x + 8` and the remaining constra
 
 For any feasible reduced value of `x`, restoring `y = 4` gives a feasible point in the original problem with the same objective value.
 
+## Mathematical formulation
+
+Consider the quadratic objective
+
+\\[
+f(x) = \tfrac12 x^T P x + c^T x + c_0,
+\\]
+
+where \\(P\\) is symmetric. Suppose variable \\(x_k\\) has equal finite bounds, fixing it to a value \\(v\\). Let \\(R\\) denote the indices of the remaining variables. Subscripts select the corresponding entries or submatrices; for example, \\(P_{RR}\\) contains the remaining rows and columns, and \\(A_{:k}\\) denotes column \\(k\\) of the constraint matrix.
+
+### Objective update
+
+Substituting \\(x_k = v\\) gives the reduced objective
+
+\\[
+f_{\mathrm{red}}(x_R) = \tfrac12 x_R^T P_{RR} x_R + (c_R + P_{Rk}v)^T x_R + c_0 + c_kv + \tfrac12 P_{kk}v^2.
+\\]
+
+Thus, the reduced objective data are
+
+\\[
+P_{\mathrm{red}} = P_{RR},
+\qquad
+c_{\mathrm{red}} = c_R + P_{Rk}v,
+\qquad
+c_{0,\mathrm{red}} = c_0 + c_kv + \tfrac12 P_{kk}v^2.
+\\]
+
+Quadratic coefficients between remaining variables are unchanged. Cross terms involving the fixed variable contribute to the remaining linear coefficients, while terms involving only the fixed variable contribute to the constant.
+
+### Linear constraint update
+
+For two-sided linear constraints
+
+\\[
+\ell \le Ax \le u,
+\\]
+
+substitution gives
+
+\\[
+\ell - A_{:k}v
+\le A_{:R}x_R
+\le u - A_{:k}v.
+\\]
+
+Infinite row bounds remain unchanged. Equality constraints are the special case \\(\ell = u = b\\), giving
+
+\\[
+A_{:R}x_R = b - A_{:k}v.
+\\]
+
+The bounds on the remaining variables are unchanged by this substitution.
+
+### Primal recovery and equivalence
+
+Postsolve reconstructs the variable vector by inserting \\(x_k = v\\) at its saved index and retaining the recovered values of \\(x_R\\).
+
+In exact arithmetic, this gives a one-to-one correspondence between feasible points of the reduced and original problems, with
+
+\\[
+f_{\mathrm{red}}(x_R) = f(x).
+\\]
+
+Consequently, the reduction preserves objective values and optimal solutions.
+
 ## Implementation overview
 
 The `fixed_variables` function processes queued variable indices. For each variable that is still active and has exactly equal, finite bounds, it calls `fix` with the shared bound value.
@@ -48,24 +114,48 @@ During ordinary solution recovery, postsolve restores the saved fixed value at t
 
 ### Dual multiplier recovery
 
-During ordinary solution recovery, postsolve recovers the fixed variable's signed bound multiplier using stationarity of the Lagrangian.
+During ordinary solution recovery, postsolve recovers the fixed variable's signed bound multiplier from stationarity. The implementation uses the sign convention
 
-Stationarity means that the derivative of the Lagrangian with respect to each primal variable is zero.
+\\[
+Px + c = A^T y + z,
+\\]
 
-For an eliminated variable at index `k`, the recovery formula is:
+where \\(y\\) contains the row multipliers and \\(z\\) contains the signed variable-bound multipliers. Thus, after restoring \\(x_k = v\\), the missing multiplier is
 
-`z_k = g_k - sum_i(a_ik * y_i)`
+\\[
+z\_k = (Px + c)\_k - A\_{:k}^T y.
+\\]
 
-Here, `g_k` is the saved objective derivative evaluated at the restored point, `a_ik` is the saved coefficient of the eliminated variable in row `i`, and `y_i` is that row's recovered dual multiplier. The result is stored in `point.z[k]`.
+The first term is the objective derivative with respect to the eliminated variable. The second term sums the contributions of its constraint coefficients and the corresponding row multipliers.
 
-For example, consider minimizing `x^2 + w^2`, with `x` fixed to `5` and the remaining constraint `x + w = 8`.
+The `Record::Fixed` record saves the objective derivative representation and removed constraint coefficients at elimination time. During reverse recovery, `gradient.evaluate(&point.x)` evaluates that derivative at the recovered point, and the implementation computes
 
-After substituting `x = 5`, the reduced problem is to minimize `25 + w^2` subject to `w = 3`. Using the Lagrangian sign convention `L = f - lambda*(x - 5) - mu*(x + w - 8)`, stationarity with respect to `w` gives `mu = 2w = 6`.
+\\[
+z_k = g_k - \sum_i a_{ik}y_i.
+\\]
 
-Postsolve restores `x = 5`. Stationarity with respect to `x` requires:
+The result is stored in `point.z[k]`. These quantities refer to the working problem at the corresponding stage of elimination and reverse recovery.
 
-`2x - lambda - mu = 0`
+Because the variable has equal lower and upper bounds, its signed bound multiplier can have either sign. The implementation recovers this combined multiplier rather than separate lower- and upper-bound multipliers.
 
-Therefore, the missing multiplier is `lambda = 10 - 6 = 4`. This corresponds to the code's recovery formula: the objective derivative is `10`, the saved row coefficient is `1`, and the row multiplier is `6`.
+#### Example
 
-The implementation represents the fixed value through equal lower and upper bounds. It recovers a single signed bound multiplier, corresponding to `lambda` in this example.
+Consider
+
+\\[
+\min_{x,w} (x^2 + w^2)
+\quad\text{subject to}\quad
+x = 5,\qquad x + w = 8.
+\\]
+
+Here, \\(x = 5\\) is represented by equal variable bounds. Eliminating it leaves the objective \\(25 + w^2\\) and the row \\(w = 3\\).
+
+The reduced solution is \\(w = 3\\). Since \\(w\\) has no variable bounds, its stationarity equation gives the row multiplier \\(y = 2w = 6\\).
+
+Postsolve restores \\(x = 5\\), then recovers
+
+\\[
+z_x = 2x - 1 \cdot y = 10 - 6 = 4.
+\\]
+
+This satisfies the eliminated variable's stationarity equation, \\(2x = y + z_x\\).
