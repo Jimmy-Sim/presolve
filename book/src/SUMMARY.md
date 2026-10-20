@@ -11,3 +11,4 @@
 - [Empty Rows](./rules/empty_rows.md)
 - [Empty Columns](./rules/empty_columns.md)
 - [Bound Propagation](./rules/bound_propagation.md)
+- [Doubleton Equalities](./rules/doubleton_equalities.md)
