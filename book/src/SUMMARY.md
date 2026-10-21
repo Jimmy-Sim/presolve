@@ -13,3 +13,4 @@
 - [Bound Propagation](./rules/bound_propagation.md)
 - [Doubleton Equalities](./rules/doubleton_equalities.md)
 - [Short Equalities](./rules/short_equalities.md)
+- [Parallel Rows](./rules/parallel_rows.md)
