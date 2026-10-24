@@ -15,3 +15,4 @@
 - [Short Equalities](./rules/short_equalities.md)
 - [Parallel Rows](./rules/parallel_rows.md)
 - [Parallel Columns](./rules/parallel_columns.md)
+- [Dominated Columns](./rules/dominated_columns.md)
