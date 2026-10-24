@@ -14,3 +14,4 @@
 - [Doubleton Equalities](./rules/doubleton_equalities.md)
 - [Short Equalities](./rules/short_equalities.md)
 - [Parallel Rows](./rules/parallel_rows.md)
+- [Parallel Columns](./rules/parallel_columns.md)
